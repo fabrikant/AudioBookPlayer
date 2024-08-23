@@ -1,4 +1,5 @@
 import os
+import platformdirs
 import typing as ty
 from functools import partial
 from pathlib import Path
@@ -10,7 +11,7 @@ from tools import pretty_view
 
 
 FIELDS = {
-    "books_folder": os.path.join(os.environ["USERPROFILE"], "documents", "Аудио книги"),
+    "books_folder": os.path.join(platformdirs.user_documents_dir(), "Аудио книги"),
     "dark_theme": "1",
 }
 

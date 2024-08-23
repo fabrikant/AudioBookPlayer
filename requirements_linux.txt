@@ -1,0 +1,3 @@
+platformdirs
+pywebview[qt]
+xlib

@@ -2,7 +2,13 @@ from __future__ import annotations
 
 import time
 import typing as ty
-from ctypes import windll, Structure, c_long, byref
+import os
+if os.name == 'nt':
+    from ctypes import windll, Structure, c_long, byref
+else:
+    from ctypes import Structure, c_long, byref
+    import Xlib
+    from Xlib import display
 
 from loguru import logger
 
@@ -66,7 +72,13 @@ class POINT(Structure):
 
 def query_mouse_position() -> tuple[int, int]:
     pt = POINT()
-    windll.user32.GetCursorPos(byref(pt))
+    if os.name == 'nt':
+        windll.user32.GetCursorPos(byref(pt))
+    else:
+        qp = display.Display().screen().root.query_pointer()
+        pt.x = qp.root_x
+        pt.y = qp.root_y
+    print(pt)
     return pt.x, pt.y
 
 
@@ -75,7 +87,10 @@ def query_scale_k() -> float:
     """
     Масштаб экрана(на ноутбуках обычно стоит 125%)
     """
-    return windll.shcore.GetScaleFactorForDevice(0) / 100
+    if os.name == 'nt':
+        return windll.shcore.GetScaleFactorForDevice(0) / 100
+    else:
+        return 1
 
 
 def resize(window: webview.Window, width: int, height: int) -> None:
@@ -88,7 +103,7 @@ def move(window: webview.Window, x: int, y: int) -> None:
 
 
 def resize_handler(window: webview.Window, size_grip):
-    state_left = windll.user32.GetKeyState(0x01)
+    state_left = mouse_state()
 
     # Определяем начальное положение курсора, окна и его размер
     start_x, start_y = query_mouse_position()
@@ -103,7 +118,7 @@ def resize_handler(window: webview.Window, size_grip):
 
     while True:
         # Пользователь отпустил кнопку мыши
-        if windll.user32.GetKeyState(0x01) != state_left:
+        if mouse_state() != state_left:
             logger.trace("resize finished")
             break
 
@@ -140,15 +155,33 @@ def resize_handler(window: webview.Window, size_grip):
 
 
 def move_to_cursor(window: webview.Window) -> None:
-    user32 = windll.user32
-    screen_width = user32.GetSystemMetrics(0)
+    screen_width = 0
+    if os.name == 'nt':
+        screen_width = windll.user32.GetSystemMetrics(0)
+    else:
+        screen_width = display.Display().screen().width_in_pixels
+
     mouse_x = query_mouse_position()[0]
     window_width = window.width
     window.move(int(mouse_x - (window_width * mouse_x / screen_width)), 0)
 
 
+def mouse_state():
+    state_left = None
+    if os.name == 'nt':
+        state_left = windll.user32.GetKeyState(0x01)
+    else:
+        root = display.Display().screen().root
+        root.change_attributes(event_mask=Xlib.X.Button1MotionMask & (
+            Xlib.X.ButtonPressMask | Xlib.X.ButtonReleaseMask))
+        while True:
+            state_left = root.display.next_event()
+    print(state_left)
+    return state_left
+
+
 def drag_window(window: webview.Window) -> None:
-    state_left = windll.user32.GetKeyState(0x01)
+    state_left = mouse_state()
 
     # Определяем начальное положение курсора и окна
     start_x, start_y = query_mouse_position()
@@ -159,7 +192,7 @@ def drag_window(window: webview.Window) -> None:
 
     while True:
         # Пользователь отпустил кнопку мыши
-        if windll.user32.GetKeyState(0x01) != state_left:
+        if mouse_state() != state_left:
             logger.trace("drag finished")
             break
 
